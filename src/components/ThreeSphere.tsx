@@ -147,12 +147,13 @@ export default function ThreeSphere() {
       scrollProgress = window.scrollY / scrollHeight;
 
       // Phase 1: 0% - 33% scroll = zoom in (z: 18 to 0.3)
+      // Proportional rotation: 33/60 of total scroll range
       if (scrollProgress <= 0.33) {
         const phase1Progress = scrollProgress / 0.33;
         targetZ = 18 - phase1Progress * 17.7;
         targetX = -4 + phase1Progress * 4; // Move from -4 to 0
         targetY = 1 - phase1Progress * 0.5; // Move from 1 to 0.5
-        targetRotationY = phase1Progress * Math.PI * 2;
+        targetRotationY = phase1Progress * Math.PI * (2 * 0.33 / 0.60); // 0° to 198° (33/60 of 360°)
         targetRotationX = 0;
 
         // Logo fade out
@@ -161,11 +162,12 @@ export default function ThreeSphere() {
         }
       } else if (scrollProgress <= 0.40) {
         // Phase 2: 33% - 40% scroll = zoom in closer to see the wall of photos
+        // Proportional rotation: 7/60 of total scroll range
         const phase2Progress = (scrollProgress - 0.33) / 0.07;
         targetZ = 0.3 - phase2Progress * 1.0; // Zoom from 0.3 to -0.7 (deep inside the wall)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
-        targetRotationY = Math.PI * 2; // Stop rotating
+        targetRotationY = Math.PI * (2 * 0.33 / 0.60) + phase2Progress * Math.PI * (2 * 0.07 / 0.60); // 198° to 240° (7/60 of 360°)
         targetRotationX = 0;
 
         // Keep logo hidden
@@ -174,12 +176,12 @@ export default function ThreeSphere() {
         }
       } else if (scrollProgress <= 0.60) {
         // Phase 3: 40% - 60% scroll = interactive rotation while staying inside
+        // Proportional rotation: 20/60 of total scroll range
         const phase3Progress = (scrollProgress - 0.40) / 0.20;
         targetZ = -0.7; // Stay at the same deep position
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
-        // Rotate based on scroll progress - 1 full rotation (360 degrees)
-        targetRotationY = Math.PI * 2 + phase3Progress * Math.PI * 2; // Additional 360 degrees
+        targetRotationY = Math.PI * (2 * 0.40 / 0.60) + phase3Progress * Math.PI * (2 * 0.20 / 0.60); // 240° to 360° (20/60 of 360°)
         targetRotationX = 0;
 
         // Keep logo hidden
@@ -233,7 +235,7 @@ export default function ThreeSphere() {
           // Scale up hovered mesh
           const meshData = meshes.find(m => m.mesh === hoveredMesh);
           if (meshData) {
-            meshData.baseScale = 1.2;
+            meshData.baseScale = 2;
           }
         }
       } else {
