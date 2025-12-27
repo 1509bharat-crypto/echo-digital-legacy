@@ -147,13 +147,13 @@ export default function ThreeSphere() {
       scrollProgress = window.scrollY / scrollHeight;
 
       // Phase 1: 0% - 33% scroll = zoom in (z: 18 to 0.3)
-      // Proportional rotation: 33/60 of total scroll range
+      // Organic rotation: Start slow, accelerate (left to right)
       if (scrollProgress <= 0.33) {
         const phase1Progress = scrollProgress / 0.33;
         targetZ = 18 - phase1Progress * 17.7;
         targetX = -4 + phase1Progress * 4; // Move from -4 to 0
         targetY = 1 - phase1Progress * 0.5; // Move from 1 to 0.5
-        targetRotationY = phase1Progress * Math.PI * (2 * 0.33 / 0.60); // 0° to 198° (33/60 of 360°)
+        targetRotationY = -phase1Progress * Math.PI * 1.4; // 0° to -252° (left to right rotation)
         targetRotationX = 0;
 
         // Logo fade out
@@ -162,12 +162,12 @@ export default function ThreeSphere() {
         }
       } else if (scrollProgress <= 0.40) {
         // Phase 2: 33% - 40% scroll = zoom in closer to see the wall of photos
-        // Proportional rotation: 7/60 of total scroll range
+        // Organic rotation: Gentle continuation (left to right)
         const phase2Progress = (scrollProgress - 0.33) / 0.07;
         targetZ = 0.3 - phase2Progress * 1.0; // Zoom from 0.3 to -0.7 (deep inside the wall)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
-        targetRotationY = Math.PI * (2 * 0.33 / 0.60) + phase2Progress * Math.PI * (2 * 0.07 / 0.60); // 198° to 240° (7/60 of 360°)
+        targetRotationY = -Math.PI * 1.4 - phase2Progress * Math.PI * 0.35; // -252° to -315° (gentle 63° turn)
         targetRotationX = 0;
 
         // Keep logo hidden
@@ -175,13 +175,13 @@ export default function ThreeSphere() {
           logoRef.current.style.opacity = '0';
         }
       } else if (scrollProgress <= 0.60) {
-        // Phase 3: 40% - 60% scroll = interactive rotation while staying inside
-        // Proportional rotation: 20/60 of total scroll range
+        // Phase 3: 40% - 60% scroll = interactive rotation while zooming deeper
+        // Organic rotation: Slow down for exploration (left to right)
         const phase3Progress = (scrollProgress - 0.40) / 0.20;
-        targetZ = -0.7; // Stay at the same deep position
+        targetZ = -0.7 - phase3Progress * 0.5; // Zoom from -0.7 to -1.2 (deeper inside)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
-        targetRotationY = Math.PI * (2 * 0.40 / 0.60) + phase3Progress * Math.PI * (2 * 0.20 / 0.60); // 240° to 360° (20/60 of 360°)
+        targetRotationY = -Math.PI * 1.75 - phase3Progress * Math.PI * 0.6; // -315° to -423° (108° for exploration)
         targetRotationX = 0;
 
         // Keep logo hidden
@@ -262,9 +262,9 @@ export default function ThreeSphere() {
       // Update scroll targets every frame for smooth animation
       updateScrollTargets();
 
-      // Gentle auto rotation (pause when hovering)
+      // Gentle auto rotation (pause when hovering) - left to right
       if (!rotationPaused) {
-        autoRotation += 0.0005;
+        autoRotation -= 0.0005;
       }
 
       // Smooth lerp to targets
