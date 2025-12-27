@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { IMAGE_PATHS } from '@/lib/imagePaths';
 import imageMetadata from '@/lib/imageMetadata.json';
@@ -8,6 +8,7 @@ import imageMetadata from '@/lib/imageMetadata.json';
 export default function ThreeSphere() {
   const containerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
+  const [phase4Progress, setPhase4Progress] = useState(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -182,6 +183,8 @@ export default function ThreeSphere() {
     let targetY = 1;
     let targetRotationY = 0;
     let targetRotationX = 0;
+    let currentSphereScale = 1;
+    let targetSphereScale = 1;
 
     // Update scroll-based targets in animation loop for smoothness
     const updateScrollTargets = () => {
@@ -227,6 +230,33 @@ export default function ThreeSphere() {
         targetRotationX = 0;
 
         // Keep logo hidden
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
+        }
+      } else if (scrollProgress <= 0.80) {
+        // Phase 4: 60% - 80% scroll = scale up sphere, fade out squares, fade in text
+        const phase4Progress = (scrollProgress - 0.60) / 0.20;
+        targetZ = -1.1; // Keep deep zoom
+        targetX = 0;
+        targetY = 0.5;
+        // Continue organic rotation: -423° to -567° (144° gentle turn)
+        targetRotationY = -Math.PI * 2.35 - phase4Progress * Math.PI * 0.8; // -423° to -567°
+        targetRotationX = 0;
+        targetSphereScale = 1 + phase4Progress * 2; // Scale from 1 to 3
+
+        // Keep logo hidden
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
+        }
+      } else {
+        // After Phase 4
+        targetZ = -1.1;
+        targetX = 0;
+        targetY = 0.5;
+        targetRotationY = -Math.PI * 3.15; // Keep final rotation at -567°
+        targetRotationX = 0;
+        targetSphereScale = 3; // Keep scaled
+
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
@@ -315,9 +345,11 @@ export default function ThreeSphere() {
       currentZ += (targetZ - currentZ) * 0.05;
       currentX += (targetX - currentX) * 0.05;
       currentY += (targetY - currentY) * 0.05;
+      currentSphereScale += (targetSphereScale - currentSphereScale) * 0.05;
 
       group.rotation.y = currentRotationY + autoRotation;
       group.rotation.x = currentRotationX;
+      group.scale.set(currentSphereScale, currentSphereScale, currentSphereScale);
       camera.position.z = currentZ;
       camera.position.x = currentX;
       camera.position.y = currentY;
@@ -332,6 +364,14 @@ export default function ThreeSphere() {
         ? (scrollProgress - 0.40) / 0.20
         : scrollProgress > 0.60 ? 1 : 0;
 
+      // Phase 4 effects (60%-80%)
+      const phase4ProgressValue = scrollProgress > 0.60 && scrollProgress <= 0.80
+        ? (scrollProgress - 0.60) / 0.20
+        : scrollProgress > 0.80 ? 1 : 0;
+
+      // Update state for React component
+      setPhase4Progress(phase4ProgressValue);
+
       // Update each mesh
       meshes.forEach((meshData) => {
         const squareGroup = meshData.mesh;
@@ -341,7 +381,12 @@ export default function ThreeSphere() {
         // Calculate depth for base white square opacity
         const depth = worldPos.z;
         const normalizedDepth = (depth + radius) / (radius * 2);
-        const baseOpacity = 0.1 + normalizedDepth * 0.9;
+        let baseOpacity = 0.1 + normalizedDepth * 0.9;
+
+        // Fade out squares during Phase 4
+        if (scrollProgress > 0.60) {
+          baseOpacity *= (1 - phase4ProgressValue);
+        }
 
         // Update base square opacity
         const baseSquare = squareGroup.children[0] as THREE.Mesh;
@@ -350,10 +395,14 @@ export default function ThreeSphere() {
         }
 
         // Show images on all squares once in Phase 2 or later
-        const showImages = scrollProgress >= 0.33;
+        const showImages = scrollProgress >= 0.33 && scrollProgress < 0.60;
 
-        // Fade in images during Phase 2
-        meshData.targetImageOpacity = showImages ? imageFadeProgress : 0;
+        // Fade in images during Phase 2, fade out during Phase 4
+        let targetImageOpacity = showImages ? imageFadeProgress : 0;
+        if (scrollProgress >= 0.60) {
+          targetImageOpacity = imageFadeProgress * (1 - phase4ProgressValue);
+        }
+        meshData.targetImageOpacity = targetImageOpacity;
         meshData.imageOpacity += (meshData.targetImageOpacity - meshData.imageOpacity) * 0.1;
 
         // Update image square opacity
@@ -362,8 +411,12 @@ export default function ThreeSphere() {
           (imageSquare.material as THREE.MeshBasicMaterial).opacity = meshData.imageOpacity;
         }
 
-        // Fade in text during Phase 3
-        meshData.targetTextOpacity = textFadeProgress;
+        // Fade in text during Phase 3, fade out during Phase 4
+        let targetTextOpacity = textFadeProgress;
+        if (scrollProgress >= 0.60) {
+          targetTextOpacity = textFadeProgress * (1 - phase4ProgressValue);
+        }
+        meshData.targetTextOpacity = targetTextOpacity;
         meshData.textOpacity += (meshData.targetTextOpacity - meshData.textOpacity) * 0.1;
 
         // Update text opacity
@@ -435,6 +488,20 @@ export default function ThreeSphere() {
             fill="white"
           />
         </svg>
+      </div>
+      {/* Phase 4 Big Text */}
+      <div className="fixed inset-0 z-30 pointer-events-none flex items-center justify-center">
+        <div
+          className="w-full h-screen flex items-center justify-center text-center px-4"
+          style={{
+            opacity: phase4Progress,
+            fontWeight: 100 + (phase4Progress * 400), // 100 (thin) to 500 (medium)
+          }}
+        >
+          <p className="text-white text-6xl font-sans max-w-5xl">
+            What happens to our digital presence when we pass away?
+          </p>
+        </div>
       </div>
       <div className="h-[300vh] pointer-events-auto" />
     </>
