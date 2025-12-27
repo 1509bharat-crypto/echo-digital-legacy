@@ -5,10 +5,25 @@ import * as THREE from 'three';
 import { IMAGE_PATHS } from '@/lib/imagePaths';
 import imageMetadata from '@/lib/imageMetadata.json';
 
+// Easing functions for smooth transitions
+const easeInOutCubic = (t: number): number => {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+};
+
+const easeOutQuad = (t: number): number => {
+  return 1 - (1 - t) * (1 - t);
+};
+
+const easeInOutQuad = (t: number): number => {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+};
+
 export default function ThreeSphere() {
   const containerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   const [phase4Progress, setPhase4Progress] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -31,9 +46,10 @@ export default function ThreeSphere() {
     camera.position.x = -4; // Initial offset to align with "O" in "echo"
     camera.position.y = 1; // Move down slightly
 
-    // Load textures
+    // Load textures with progress tracking
     const textureLoader = new THREE.TextureLoader();
-
+    let loadedTextures = 0;
+    const totalTextures = 1500; // Match pointCount
 
     // Create sphere of points
     const pointCount = 1500;
@@ -109,11 +125,30 @@ export default function ThreeSphere() {
 
           imageMaterial.map = texture;
           imageMaterial.needsUpdate = true;
+
+          // Update loading progress
+          loadedTextures++;
+          const progress = (loadedTextures / totalTextures) * 100;
+          setLoadingProgress(progress);
+
+          // Mark as loaded when we reach 100%
+          if (loadedTextures === totalTextures) {
+            setTimeout(() => setIsLoaded(true), 300);
+          }
         },
         undefined,
         () => {
           // Fallback: use a color if image fails to load
           imageMaterial.color = new THREE.Color(0x888888);
+
+          // Still count as loaded for progress
+          loadedTextures++;
+          const progress = (loadedTextures / totalTextures) * 100;
+          setLoadingProgress(progress);
+
+          if (loadedTextures === totalTextures) {
+            setTimeout(() => setIsLoaded(true), 300);
+          }
         }
       );
 
@@ -191,24 +226,24 @@ export default function ThreeSphere() {
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
       scrollProgress = window.scrollY / scrollHeight;
 
-      // Phase 1: 0% - 33% scroll = zoom in (z: 18 to 0.3)
+      // Phase 1: 0% - 35% scroll = zoom in (z: 18 to 0.3) with easing
       // Organic rotation: Start slow, accelerate (left to right)
-      if (scrollProgress <= 0.33) {
-        const phase1Progress = scrollProgress / 0.33;
+      if (scrollProgress <= 0.35) {
+        const phase1Progress = easeInOutCubic(scrollProgress / 0.35);
         targetZ = 18 - phase1Progress * 17.7;
         targetX = -4 + phase1Progress * 4; // Move from -4 to 0
         targetY = 1 - phase1Progress * 0.5; // Move from 1 to 0.5
         targetRotationY = -phase1Progress * Math.PI * 1.4; // 0° to -252° (left to right rotation)
         targetRotationX = 0;
 
-        // Logo fade out
+        // Logo fade out with easing
         if (logoRef.current) {
-          logoRef.current.style.opacity = String(1 - phase1Progress);
+          logoRef.current.style.opacity = String(1 - easeOutQuad(phase1Progress));
         }
-      } else if (scrollProgress <= 0.40) {
-        // Phase 2: 33% - 40% scroll = zoom in closer to see the wall of photos
+      } else if (scrollProgress <= 0.42) {
+        // Phase 2: 35% - 42% scroll = zoom in closer to see the wall of photos
         // Organic rotation: Gentle continuation (left to right)
-        const phase2Progress = (scrollProgress - 0.33) / 0.07;
+        const phase2Progress = easeInOutQuad((scrollProgress - 0.35) / 0.07);
         targetZ = 0.3 - phase2Progress * 1.0; // Zoom from 0.3 to -0.7 (deep inside the wall)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
@@ -219,10 +254,10 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
-      } else if (scrollProgress <= 0.60) {
-        // Phase 3: 40% - 60% scroll = interactive rotation while zooming deeper
+      } else if (scrollProgress <= 0.62) {
+        // Phase 3: 42% - 62% scroll = interactive rotation while zooming deeper
         // Organic rotation: Slow down for exploration (left to right)
-        const phase3Progress = (scrollProgress - 0.40) / 0.20;
+        const phase3Progress = easeInOutCubic((scrollProgress - 0.42) / 0.20);
         targetZ = -0.7 - phase3Progress * 0.4; // Zoom from -0.7 to -1.1 (deeper inside)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
@@ -233,9 +268,9 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
-      } else if (scrollProgress <= 0.80) {
-        // Phase 4: 60% - 80% scroll = scale up sphere, fade out squares, fade in text
-        const phase4Progress = (scrollProgress - 0.60) / 0.20;
+      } else if (scrollProgress <= 0.82) {
+        // Phase 4: 62% - 82% scroll = scale up sphere, fade out squares, fade in text
+        const phase4Progress = easeInOutCubic((scrollProgress - 0.62) / 0.20);
         targetZ = -1.1; // Keep deep zoom
         targetX = 0;
         targetY = 0.5;
@@ -339,13 +374,13 @@ export default function ThreeSphere() {
         autoRotation -= 0.0005;
       }
 
-      // Smooth lerp to targets
-      currentRotationY += (targetRotationY - currentRotationY) * 0.05;
-      currentRotationX += (targetRotationX - currentRotationX) * 0.05;
-      currentZ += (targetZ - currentZ) * 0.05;
-      currentX += (targetX - currentX) * 0.05;
-      currentY += (targetY - currentY) * 0.05;
-      currentSphereScale += (targetSphereScale - currentSphereScale) * 0.05;
+      // Smooth lerp to targets with increased smoothing
+      currentRotationY += (targetRotationY - currentRotationY) * 0.08;
+      currentRotationX += (targetRotationX - currentRotationX) * 0.08;
+      currentZ += (targetZ - currentZ) * 0.08;
+      currentX += (targetX - currentX) * 0.08;
+      currentY += (targetY - currentY) * 0.08;
+      currentSphereScale += (targetSphereScale - currentSphereScale) * 0.08;
 
       group.rotation.y = currentRotationY + autoRotation;
       group.rotation.x = currentRotationX;
@@ -354,20 +389,20 @@ export default function ThreeSphere() {
       camera.position.x = currentX;
       camera.position.y = currentY;
 
-      // Image fade-in during Phase 2 (33%-40%)
-      const imageFadeProgress = scrollProgress > 0.33 && scrollProgress <= 0.40
-        ? (scrollProgress - 0.33) / 0.07
-        : scrollProgress > 0.40 ? 1 : 0;
+      // Image fade-in during Phase 2 (35%-42%) with easing
+      const imageFadeProgress = scrollProgress > 0.35 && scrollProgress <= 0.42
+        ? easeInOutQuad((scrollProgress - 0.35) / 0.07)
+        : scrollProgress > 0.42 ? 1 : 0;
 
-      // Text fade-in during Phase 3 (40%-60%)
-      const textFadeProgress = scrollProgress > 0.40 && scrollProgress <= 0.60
-        ? (scrollProgress - 0.40) / 0.20
-        : scrollProgress > 0.60 ? 1 : 0;
+      // Text fade-in during Phase 3 (42%-62%) with easing
+      const textFadeProgress = scrollProgress > 0.42 && scrollProgress <= 0.62
+        ? easeInOutCubic((scrollProgress - 0.42) / 0.20)
+        : scrollProgress > 0.62 ? 1 : 0;
 
-      // Phase 4 effects (60%-80%)
-      const phase4ProgressValue = scrollProgress > 0.60 && scrollProgress <= 0.80
-        ? (scrollProgress - 0.60) / 0.20
-        : scrollProgress > 0.80 ? 1 : 0;
+      // Phase 4 effects (62%-82%) with easing
+      const phase4ProgressValue = scrollProgress > 0.62 && scrollProgress <= 0.82
+        ? easeInOutCubic((scrollProgress - 0.62) / 0.20)
+        : scrollProgress > 0.82 ? 1 : 0;
 
       // Update state for React component
       setPhase4Progress(phase4ProgressValue);
@@ -383,8 +418,8 @@ export default function ThreeSphere() {
         const normalizedDepth = (depth + radius) / (radius * 2);
         let baseOpacity = 0.1 + normalizedDepth * 0.9;
 
-        // Fade out squares during Phase 4
-        if (scrollProgress > 0.60) {
+        // Fade out squares during Phase 4 with smooth easing
+        if (scrollProgress > 0.62) {
           baseOpacity *= (1 - phase4ProgressValue);
         }
 
@@ -395,15 +430,15 @@ export default function ThreeSphere() {
         }
 
         // Show images on all squares once in Phase 2 or later
-        const showImages = scrollProgress >= 0.33 && scrollProgress < 0.60;
+        const showImages = scrollProgress >= 0.35 && scrollProgress < 0.62;
 
-        // Fade in images during Phase 2, fade out during Phase 4
+        // Fade in images during Phase 2, fade out during Phase 4 with smoother transitions
         let targetImageOpacity = showImages ? imageFadeProgress : 0;
-        if (scrollProgress >= 0.60) {
+        if (scrollProgress >= 0.62) {
           targetImageOpacity = imageFadeProgress * (1 - phase4ProgressValue);
         }
         meshData.targetImageOpacity = targetImageOpacity;
-        meshData.imageOpacity += (meshData.targetImageOpacity - meshData.imageOpacity) * 0.1;
+        meshData.imageOpacity += (meshData.targetImageOpacity - meshData.imageOpacity) * 0.15;
 
         // Update image square opacity
         const imageSquare = squareGroup.children[1] as THREE.Mesh;
@@ -411,13 +446,13 @@ export default function ThreeSphere() {
           (imageSquare.material as THREE.MeshBasicMaterial).opacity = meshData.imageOpacity;
         }
 
-        // Fade in text during Phase 3, fade out during Phase 4
+        // Fade in text during Phase 3, fade out during Phase 4 with smoother transitions
         let targetTextOpacity = textFadeProgress;
-        if (scrollProgress >= 0.60) {
+        if (scrollProgress >= 0.62) {
           targetTextOpacity = textFadeProgress * (1 - phase4ProgressValue);
         }
         meshData.targetTextOpacity = targetTextOpacity;
-        meshData.textOpacity += (meshData.targetTextOpacity - meshData.textOpacity) * 0.1;
+        meshData.textOpacity += (meshData.targetTextOpacity - meshData.textOpacity) * 0.15;
 
         // Update text opacity
         const textMesh = squareGroup.children[2] as THREE.Mesh;
@@ -448,6 +483,19 @@ export default function ThreeSphere() {
 
   return (
     <>
+      {/* Loading Screen */}
+      <div
+        className="fixed inset-0 z-50 bg-black flex items-center justify-center transition-opacity duration-1000"
+        style={{
+          opacity: isLoaded ? 0 : 1,
+          pointerEvents: isLoaded ? 'none' : 'auto',
+        }}
+      >
+        <div className="text-white font-sans text-[20vw] font-thin tracking-tight leading-none">
+          {Math.round(loadingProgress)}
+        </div>
+      </div>
+
       <div ref={containerRef} className="fixed top-0 left-0" />
       {/* Vignette overlay */}
       <div
@@ -494,8 +542,8 @@ export default function ThreeSphere() {
         <div
           className="w-full h-screen flex items-center justify-center text-center px-4"
           style={{
-            opacity: phase4Progress,
-            fontWeight: 100 + (phase4Progress * 400), // 100 (thin) to 500 (medium)
+            opacity: easeInOutCubic(phase4Progress),
+            fontWeight: 100 + (easeInOutCubic(phase4Progress) * 400), // 100 (thin) to 500 (medium)
           }}
         >
           <p className="text-white text-6xl font-sans max-w-5xl">
