@@ -1,7 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
-import gsap from 'gsap';
+import { useRef } from 'react';
 import { ImagePixel } from '@/components/atoms/ImagePixel';
 import { InfiniteImageWallProps } from './InfiniteImageWall.types';
 
@@ -10,52 +9,34 @@ export const InfiniteImageWall = ({
   className = ''
 }: InfiniteImageWallProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [images, setImages] = useState<string[]>([]);
 
-  useEffect(() => {
-    // Calculate actual cell size to fill viewport
-    const generateImages = () => {
-      const cols = Math.floor(window.innerWidth / pixelSize);
-      const rows = Math.floor(window.innerHeight / pixelSize);
-      const totalImages = cols * rows;
+  const gap = pixelSize * 0.4; // 40% of pixelSize for gap
+  const cols = Math.floor(window.innerWidth / (pixelSize + gap));
+  const rows = Math.floor(window.innerHeight / (pixelSize + gap));
 
-      const imageList = Array.from({ length: totalImages }, (_, i) => {
-        const seed = Math.floor(Math.random() * 1000);
-        return `https://picsum.photos/seed/${seed}/100/100`;
-      });
+  // Calculate scaled size to fill viewport with gaps
+  const scaledWidth = (window.innerWidth - gap * (cols - 1)) / cols;
+  const scaledHeight = (window.innerHeight - gap * (rows - 1)) / rows;
 
-      setImages(imageList);
-    };
-
-    generateImages();
-    window.addEventListener('resize', generateImages);
-
-    return () => window.removeEventListener('resize', generateImages);
-  }, [pixelSize]);
-
-  const cols = Math.floor(window.innerWidth / pixelSize);
-  const rows = Math.floor(window.innerHeight / pixelSize);
-
-  // Calculate scaled size to fill viewport
-  const scaledWidth = window.innerWidth / cols;
-  const scaledHeight = window.innerHeight / rows;
+  const totalCells = cols * rows;
 
   return (
     <div className={`w-screen h-screen overflow-hidden ${className}`}>
       <div
         ref={containerRef}
-        className="grid gap-0 w-full h-full"
+        className="grid w-full h-full"
         style={{
           gridTemplateColumns: `repeat(${cols}, ${scaledWidth}px)`,
-          gridTemplateRows: `repeat(${rows}, ${scaledHeight}px)`
+          gridTemplateRows: `repeat(${rows}, ${scaledHeight}px)`,
+          gap: `${gap}px`
         }}
       >
-        {images.map((src, i) => (
+        {Array.from({ length: totalCells }).map((_, i) => (
           <ImagePixel
             key={i}
-            src={src}
+            src=""
             size={Math.min(scaledWidth, scaledHeight)}
-            alt={`Image ${i}`}
+            alt=""
           />
         ))}
       </div>
