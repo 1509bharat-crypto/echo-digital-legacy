@@ -76,7 +76,8 @@ export default function ThreeSphere() {
     let targetRotationY = 0;
     let targetRotationX = 0;
 
-    const handleScroll = () => {
+    // Update scroll-based targets in animation loop for smoothness
+    const updateScrollTargets = () => {
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
       scrollProgress = window.scrollY / scrollHeight;
 
@@ -101,8 +102,6 @@ export default function ThreeSphere() {
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-
     // Handle resize
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -117,6 +116,9 @@ export default function ThreeSphere() {
 
     function animate() {
       requestAnimationFrame(animate);
+
+      // Update scroll targets every frame for smooth animation
+      updateScrollTargets();
 
       // Gentle auto rotation
       autoRotation += 0.0005;
@@ -151,7 +153,6 @@ export default function ThreeSphere() {
 
     // Cleanup
     return () => {
-      window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
       containerRef.current?.removeChild(renderer.domElement);
       renderer.dispose();
