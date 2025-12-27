@@ -25,7 +25,7 @@ export default function ThreeSphere() {
     containerRef.current.appendChild(renderer.domElement);
 
     camera.position.z = 18;
-    camera.position.x = -4; // Offset to align with "O" in "echo"
+    camera.position.x = -4; // Initial offset to align with "O" in "echo"
     camera.position.y = 1; // Move down slightly
 
     // Create sphere of points
@@ -68,7 +68,11 @@ export default function ThreeSphere() {
     let currentRotationY = 0;
     let currentRotationX = 0;
     let currentZ = 18;
+    let currentX = -4;
+    let currentY = 1;
     let targetZ = 18;
+    let targetX = -4;
+    let targetY = 1;
     let targetRotationY = 0;
     let targetRotationX = 0;
 
@@ -80,12 +84,19 @@ export default function ThreeSphere() {
       if (scrollProgress <= 0.33) {
         const phase1Progress = scrollProgress / 0.33;
         targetZ = 18 - phase1Progress * 17.7;
+        targetX = -4 + phase1Progress * 4; // Move from -4 to 0
+        targetY = 1 - phase1Progress * 0.5; // Move from 1 to 0.5
         targetRotationY = phase1Progress * Math.PI * 2;
         targetRotationX = 0;
 
         // Logo fade out
         if (logoRef.current) {
           logoRef.current.style.opacity = String(1 - phase1Progress);
+        }
+      } else {
+        // Keep logo hidden after 33% scroll
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
         }
       }
     };
@@ -114,10 +125,14 @@ export default function ThreeSphere() {
       currentRotationY += (targetRotationY - currentRotationY) * 0.05;
       currentRotationX += (targetRotationX - currentRotationX) * 0.05;
       currentZ += (targetZ - currentZ) * 0.05;
+      currentX += (targetX - currentX) * 0.05;
+      currentY += (targetY - currentY) * 0.05;
 
       group.rotation.y = currentRotationY + autoRotation;
       group.rotation.x = currentRotationX;
       camera.position.z = currentZ;
+      camera.position.x = currentX;
+      camera.position.y = currentY;
 
       // Update opacity based on depth
       group.children.forEach((circle) => {
