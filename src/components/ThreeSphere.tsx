@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { IMAGE_PATHS } from '@/lib/imagePaths';
+import imageMetadata from '@/lib/imageMetadata.json';
 
 export default function ThreeSphere() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,6 +33,7 @@ export default function ThreeSphere() {
     // Load textures
     const textureLoader = new THREE.TextureLoader();
 
+
     // Create sphere of points
     const pointCount = 1500;
     const radius = 2;
@@ -41,6 +43,8 @@ export default function ThreeSphere() {
       baseScale: number;
       imageOpacity: number;
       targetImageOpacity: number;
+      textOpacity: number;
+      targetTextOpacity: number;
     }> = [];
 
     for (let i = 0; i < pointCount; i++) {
@@ -78,6 +82,10 @@ export default function ThreeSphere() {
 
       // Load random image texture
       const randomImagePath = IMAGE_PATHS[Math.floor(Math.random() * IMAGE_PATHS.length)];
+
+      // Store the image path for this mesh to retrieve metadata later
+      const currentImagePath = randomImagePath;
+
       textureLoader.load(
         randomImagePath,
         (texture) => {
@@ -112,6 +120,38 @@ export default function ThreeSphere() {
       imageSquare.position.z = 0.001; // Slightly in front of base square
       squareGroup.add(imageSquare);
 
+      // Create text label below image with real metadata
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      canvas.width = 256;
+      canvas.height = 64;
+
+      // Get metadata for this specific image
+      const metadata = imageMetadata[currentImagePath as keyof typeof imageMetadata];
+
+      context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      context.font = '16px "Google Sans", sans-serif';
+      context.textAlign = 'left';
+
+      if (metadata) {
+        context.fillText(metadata.location, 10, 24);
+        context.fillText(metadata.date, 10, 44);
+      }
+
+      const textTexture = new THREE.CanvasTexture(canvas);
+      const textMaterial = new THREE.MeshBasicMaterial({
+        map: textTexture,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+      });
+
+      const textGeometry = new THREE.PlaneGeometry(0.08, 0.02);
+      const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+      textMesh.position.y = -0.05; // Position below the image
+      textMesh.position.z = 0.002; // Slightly in front
+      squareGroup.add(textMesh);
+
       squareGroup.position.set(x, y, z);
       squareGroup.lookAt(0, 0, 0);
 
@@ -123,6 +163,8 @@ export default function ThreeSphere() {
         baseScale: 1,
         imageOpacity: 0,
         targetImageOpacity: 0,
+        textOpacity: 0,
+        targetTextOpacity: 0,
       });
     }
 
@@ -178,7 +220,7 @@ export default function ThreeSphere() {
         // Phase 3: 40% - 60% scroll = interactive rotation while zooming deeper
         // Organic rotation: Slow down for exploration (left to right)
         const phase3Progress = (scrollProgress - 0.40) / 0.20;
-        targetZ = -0.7 - phase3Progress * 0.5; // Zoom from -0.7 to -1.2 (deeper inside)
+        targetZ = -0.7 - phase3Progress * 0.4; // Zoom from -0.7 to -1.1 (deeper inside)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
         targetRotationY = -Math.PI * 1.75 - phase3Progress * Math.PI * 0.6; // -315° to -423° (108° for exploration)
@@ -285,6 +327,11 @@ export default function ThreeSphere() {
         ? (scrollProgress - 0.33) / 0.07
         : scrollProgress > 0.40 ? 1 : 0;
 
+      // Text fade-in during Phase 3 (40%-60%)
+      const textFadeProgress = scrollProgress > 0.40 && scrollProgress <= 0.60
+        ? (scrollProgress - 0.40) / 0.20
+        : scrollProgress > 0.60 ? 1 : 0;
+
       // Update each mesh
       meshes.forEach((meshData) => {
         const squareGroup = meshData.mesh;
@@ -302,18 +349,27 @@ export default function ThreeSphere() {
           (baseSquare.material as THREE.MeshBasicMaterial).opacity = baseOpacity;
         }
 
-        // Determine if this square is close to camera (interactive)
-        const distanceToCamera = worldPos.distanceTo(camera.position);
-        const isInteractive = scrollProgress >= 0.33 && distanceToCamera < 1.5;
+        // Show images on all squares once in Phase 2 or later
+        const showImages = scrollProgress >= 0.33;
 
         // Fade in images during Phase 2
-        meshData.targetImageOpacity = isInteractive ? imageFadeProgress : 0;
+        meshData.targetImageOpacity = showImages ? imageFadeProgress : 0;
         meshData.imageOpacity += (meshData.targetImageOpacity - meshData.imageOpacity) * 0.1;
 
         // Update image square opacity
         const imageSquare = squareGroup.children[1] as THREE.Mesh;
         if (imageSquare.material) {
           (imageSquare.material as THREE.MeshBasicMaterial).opacity = meshData.imageOpacity;
+        }
+
+        // Fade in text during Phase 3
+        meshData.targetTextOpacity = textFadeProgress;
+        meshData.textOpacity += (meshData.targetTextOpacity - meshData.textOpacity) * 0.1;
+
+        // Update text opacity
+        const textMesh = squareGroup.children[2] as THREE.Mesh;
+        if (textMesh && textMesh.material) {
+          (textMesh.material as THREE.MeshBasicMaterial).opacity = meshData.textOpacity * 0.8;
         }
 
         // Apply scale (smooth transition)
