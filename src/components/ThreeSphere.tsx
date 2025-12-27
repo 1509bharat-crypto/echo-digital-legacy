@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { IMAGE_PATHS } from '@/lib/imagePaths';
 
 export default function ThreeSphere() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -28,10 +29,19 @@ export default function ThreeSphere() {
     camera.position.x = -4; // Initial offset to align with "O" in "echo"
     camera.position.y = 1; // Move down slightly
 
+    // Load textures
+    const textureLoader = new THREE.TextureLoader();
+
     // Create sphere of points
     const pointCount = 1500;
     const radius = 2;
     const group = new THREE.Group();
+    const meshes: Array<{
+      mesh: THREE.Group;
+      baseScale: number;
+      imageOpacity: number;
+      targetImageOpacity: number;
+    }> = [];
 
     for (let i = 0; i < pointCount; i++) {
       // Fibonacci sphere distribution for even spacing
@@ -46,19 +56,74 @@ export default function ThreeSphere() {
       const y = r * Math.sin(phi) * Math.sin(theta);
       const z = r * Math.cos(phi);
 
-      // Simple square geometry
+      // Create a group for each square (white base + image overlay)
+      const squareGroup = new THREE.Group();
+
+      // Base white square
       const geometry = new THREE.PlaneGeometry(0.08, 0.08);
-      const material = new THREE.MeshBasicMaterial({
+      const baseMaterial = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         side: THREE.DoubleSide,
         transparent: true,
       });
-      const circle = new THREE.Mesh(geometry, material);
+      const baseSquare = new THREE.Mesh(geometry, baseMaterial);
+      squareGroup.add(baseSquare);
 
-      circle.position.set(x, y, z);
-      circle.lookAt(0, 0, 0);
+      // Image overlay (initially transparent)
+      const imageMaterial = new THREE.MeshBasicMaterial({
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0,
+      });
 
-      group.add(circle);
+      // Load random image texture
+      const randomImagePath = IMAGE_PATHS[Math.floor(Math.random() * IMAGE_PATHS.length)];
+      textureLoader.load(
+        randomImagePath,
+        (texture) => {
+          // Ensure image fills the square without stretching
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+
+          // Calculate UV mapping to fill square while maintaining aspect ratio
+          const imageAspect = texture.image.width / texture.image.height;
+
+          if (imageAspect > 1) {
+            // Image is wider than tall - crop horizontally
+            texture.repeat.set(1 / imageAspect, 1);
+            texture.offset.set((1 - 1 / imageAspect) / 2, 0);
+          } else {
+            // Image is taller than wide - crop vertically
+            texture.repeat.set(1, imageAspect);
+            texture.offset.set(0, (1 - imageAspect) / 2);
+          }
+
+          imageMaterial.map = texture;
+          imageMaterial.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          // Fallback: use a color if image fails to load
+          imageMaterial.color = new THREE.Color(0x888888);
+        }
+      );
+
+      const imageSquare = new THREE.Mesh(geometry.clone(), imageMaterial);
+      imageSquare.position.z = 0.001; // Slightly in front of base square
+      squareGroup.add(imageSquare);
+
+      squareGroup.position.set(x, y, z);
+      squareGroup.lookAt(0, 0, 0);
+
+      group.add(squareGroup);
+
+      // Store mesh data for interactivity
+      meshes.push({
+        mesh: squareGroup,
+        baseScale: 1,
+        imageOpacity: 0,
+        targetImageOpacity: 0,
+      });
     }
 
     scene.add(group);
@@ -133,6 +198,59 @@ export default function ThreeSphere() {
 
     window.addEventListener('resize', handleResize);
 
+    // Mouse interaction
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredMesh: THREE.Group | null = null;
+    let rotationPaused = false;
+
+    const onMouseMove = (event: MouseEvent) => {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(group.children, true);
+
+      if (intersects.length > 0) {
+        // Find the parent group (squareGroup)
+        let parentGroup = intersects[0].object.parent;
+        while (parentGroup && !(parentGroup.parent === group)) {
+          parentGroup = parentGroup.parent;
+        }
+
+        if (parentGroup && parentGroup !== hoveredMesh) {
+          // Reset previous hovered mesh
+          if (hoveredMesh) {
+            const prevData = meshes.find(m => m.mesh === hoveredMesh);
+            if (prevData) {
+              prevData.baseScale = 1;
+            }
+          }
+
+          hoveredMesh = parentGroup as THREE.Group;
+          rotationPaused = true;
+
+          // Scale up hovered mesh
+          const meshData = meshes.find(m => m.mesh === hoveredMesh);
+          if (meshData) {
+            meshData.baseScale = 1.2;
+          }
+        }
+      } else {
+        // No hover
+        if (hoveredMesh) {
+          const prevData = meshes.find(m => m.mesh === hoveredMesh);
+          if (prevData) {
+            prevData.baseScale = 1;
+          }
+          hoveredMesh = null;
+          rotationPaused = false;
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+
     // Animation loop
     let autoRotation = 0;
 
@@ -142,8 +260,10 @@ export default function ThreeSphere() {
       // Update scroll targets every frame for smooth animation
       updateScrollTargets();
 
-      // Gentle auto rotation
-      autoRotation += 0.0005;
+      // Gentle auto rotation (pause when hovering)
+      if (!rotationPaused) {
+        autoRotation += 0.0005;
+      }
 
       // Smooth lerp to targets
       currentRotationY += (targetRotationY - currentRotationY) * 0.05;
@@ -158,14 +278,47 @@ export default function ThreeSphere() {
       camera.position.x = currentX;
       camera.position.y = currentY;
 
-      // Update opacity based on depth
-      group.children.forEach((circle) => {
+      // Image fade-in during Phase 2 (33%-40%)
+      const imageFadeProgress = scrollProgress > 0.33 && scrollProgress <= 0.40
+        ? (scrollProgress - 0.33) / 0.07
+        : scrollProgress > 0.40 ? 1 : 0;
+
+      // Update each mesh
+      meshes.forEach((meshData) => {
+        const squareGroup = meshData.mesh;
         const worldPos = new THREE.Vector3();
-        (circle as THREE.Mesh).getWorldPosition(worldPos);
+        squareGroup.getWorldPosition(worldPos);
+
+        // Calculate depth for base white square opacity
         const depth = worldPos.z;
         const normalizedDepth = (depth + radius) / (radius * 2);
-        ((circle as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity =
-          0.1 + normalizedDepth * 0.9;
+        const baseOpacity = 0.1 + normalizedDepth * 0.9;
+
+        // Update base square opacity
+        const baseSquare = squareGroup.children[0] as THREE.Mesh;
+        if (baseSquare.material) {
+          (baseSquare.material as THREE.MeshBasicMaterial).opacity = baseOpacity;
+        }
+
+        // Determine if this square is close to camera (interactive)
+        const distanceToCamera = worldPos.distanceTo(camera.position);
+        const isInteractive = scrollProgress >= 0.33 && distanceToCamera < 1.5;
+
+        // Fade in images during Phase 2
+        meshData.targetImageOpacity = isInteractive ? imageFadeProgress : 0;
+        meshData.imageOpacity += (meshData.targetImageOpacity - meshData.imageOpacity) * 0.1;
+
+        // Update image square opacity
+        const imageSquare = squareGroup.children[1] as THREE.Mesh;
+        if (imageSquare.material) {
+          (imageSquare.material as THREE.MeshBasicMaterial).opacity = meshData.imageOpacity;
+        }
+
+        // Apply scale (smooth transition)
+        const targetScale = meshData.baseScale;
+        const currentScale = squareGroup.scale.x;
+        const newScale = currentScale + (targetScale - currentScale) * 0.1;
+        squareGroup.scale.set(newScale, newScale, newScale);
       });
 
       renderer.render(scene, camera);
@@ -176,6 +329,7 @@ export default function ThreeSphere() {
     // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', onMouseMove);
       containerRef.current?.removeChild(renderer.domElement);
       renderer.dispose();
     };
