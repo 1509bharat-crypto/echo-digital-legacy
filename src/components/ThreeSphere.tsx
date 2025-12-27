@@ -25,6 +25,8 @@ export default function ThreeSphere() {
     containerRef.current.appendChild(renderer.domElement);
 
     camera.position.z = 18;
+    camera.position.x = -4; // Offset to align with "O" in "echo"
+    camera.position.y = 1; // Move down slightly
 
     // Create sphere of points
     const pointCount = 1500;
