@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { ImagePixel } from '@/components/atoms/ImagePixel';
 import { InfiniteImageWallProps } from './InfiniteImageWall.types';
 
@@ -9,14 +9,37 @@ export const InfiniteImageWall = ({
   className = ''
 }: InfiniteImageWallProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-  const gap = pixelSize * 0.4; // 40% of pixelSize for gap
-  const cols = Math.floor(window.innerWidth / (pixelSize + gap));
-  const rows = Math.floor(window.innerHeight / (pixelSize + gap));
+  useEffect(() => {
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
 
-  // Calculate scaled size to fill viewport with gaps
-  const scaledWidth = (window.innerWidth - gap * (cols - 1)) / cols;
-  const scaledHeight = (window.innerHeight - gap * (rows - 1)) / rows;
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
+
+  if (dimensions.width === 0 || dimensions.height === 0) {
+    return null;
+  }
+
+  const gap = pixelSize * 0.25; // 25% of pixelSize for gap
+  const padding = gap; // Same padding as gap
+
+  const availableWidth = dimensions.width - (padding * 2);
+  const availableHeight = dimensions.height - (padding * 2);
+
+  const cols = Math.floor(availableWidth / (pixelSize + gap));
+  const rows = Math.floor(availableHeight / (pixelSize + gap));
+
+  // Calculate scaled size to fill viewport with gaps and padding
+  const scaledWidth = (availableWidth - gap * (cols - 1)) / cols;
+  const scaledHeight = (availableHeight - gap * (rows - 1)) / rows;
 
   const totalCells = cols * rows;
 
@@ -28,7 +51,8 @@ export const InfiniteImageWall = ({
         style={{
           gridTemplateColumns: `repeat(${cols}, ${scaledWidth}px)`,
           gridTemplateRows: `repeat(${rows}, ${scaledHeight}px)`,
-          gap: `${gap}px`
+          gap: `${gap}px`,
+          padding: `${padding}px`
         }}
       >
         {Array.from({ length: totalCells }).map((_, i) => (

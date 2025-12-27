@@ -20,7 +20,7 @@ export const ImagePixel = ({
     const handleMouseEnter = () => {
       setIsHovered(true);
       gsap.to(pixel, {
-        scale: 1.5,
+        scale: 1.1,
         zIndex: 10,
         duration: 0.3,
         ease: 'back.out(1.7)'
