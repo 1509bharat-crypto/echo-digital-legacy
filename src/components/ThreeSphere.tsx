@@ -94,8 +94,30 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = String(1 - phase1Progress);
         }
-      } else {
-        // Keep logo hidden after 33% scroll
+      } else if (scrollProgress <= 0.40) {
+        // Phase 2: 33% - 40% scroll = zoom in closer to see the wall of photos
+        const phase2Progress = (scrollProgress - 0.33) / 0.07;
+        targetZ = 0.3 - phase2Progress * 1.0; // Zoom from 0.3 to -0.7 (deep inside the wall)
+        targetX = 0; // Keep centered
+        targetY = 0.5; // Keep centered vertically
+        targetRotationY = Math.PI * 2; // Stop rotating
+        targetRotationX = 0;
+
+        // Keep logo hidden
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
+        }
+      } else if (scrollProgress <= 0.60) {
+        // Phase 3: 40% - 60% scroll = interactive rotation while staying inside
+        const phase3Progress = (scrollProgress - 0.40) / 0.20;
+        targetZ = -0.7; // Stay at the same deep position
+        targetX = 0; // Keep centered
+        targetY = 0.5; // Keep centered vertically
+        // Rotate based on scroll progress - 1 full rotation (360 degrees)
+        targetRotationY = Math.PI * 2 + phase3Progress * Math.PI * 2; // Additional 360 degrees
+        targetRotationX = 0;
+
+        // Keep logo hidden
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
@@ -162,6 +184,13 @@ export default function ThreeSphere() {
   return (
     <>
       <div ref={containerRef} className="fixed top-0 left-0" />
+      {/* Vignette overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none z-20"
+        style={{
+          background: 'radial-gradient(circle at center, transparent 20%, rgba(0, 0, 0, 0.5) 60%, rgba(0, 0, 0, 0.95) 100%)',
+        }}
+      />
       <div
         ref={logoRef}
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none"
