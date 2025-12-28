@@ -476,11 +476,12 @@ export default function ThreeSphere() {
         let baseOpacity = 0.1 + normalizedDepth * 0.9;
 
         // Fade out squares during Phase 4 with smooth easing
-        if (scrollProgress > 0.70 && scrollProgress <= 0.96) {
+        if (scrollProgress > 0.70) {
           baseOpacity *= (1 - phase4ProgressValue);
-        } else if (scrollProgress > 0.96) {
-          // Phase 7: fade out completely
-          baseOpacity *= (1 - phase7ProgressValue);
+        }
+        // Keep squares hidden during and after Phase 7
+        if (scrollProgress > 0.96) {
+          baseOpacity = 0;
         }
 
         // Update base square opacity
@@ -556,7 +557,11 @@ export default function ThreeSphere() {
         </div>
       </div>
 
-      <div ref={containerRef} className="fixed top-0 left-0" />
+      <div
+        ref={containerRef}
+        className="fixed top-0 left-0 transition-opacity duration-500"
+        style={{ opacity: phase7Progress > 0 ? 0 : 1 }}
+      />
       {/* Vignette overlay */}
       <div
         className="fixed inset-0 pointer-events-none z-20"

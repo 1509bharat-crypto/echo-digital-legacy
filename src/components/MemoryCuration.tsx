@@ -11,6 +11,8 @@ interface MemoryCurationProps {
 export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [exitingCard, setExitingCard] = useState<{index: number, direction: 'release' | 'preserve'} | null>(null);
+  const [isEntering, setIsEntering] = useState(true);
   const [releasedCount, setReleasedCount] = useState(0);
   const [preservedCount, setPreservedCount] = useState(0);
   const [showReflection, setShowReflection] = useState(false);
@@ -27,16 +29,13 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
     "Let yourself feel...",
   ];
 
-  // Shuffle IMAGE_PATHS to create random memory order
-  const [memories] = useState(() => {
-    const shuffled = [...IMAGE_PATHS].sort(() => Math.random() - 0.5).slice(0, 27);
-    return shuffled.map((imagePath) => {
-      const metadata = imageMetadata[imagePath as keyof typeof imageMetadata];
-      return {
-        image: imagePath,
-        caption: metadata ? `${metadata.date} · ${metadata.location}` : '',
-      };
-    });
+  // Use first 27 images from IMAGE_PATHS (no random shuffle to avoid hydration errors)
+  const memories = IMAGE_PATHS.slice(0, 27).map((imagePath) => {
+    const metadata = imageMetadata[imagePath as keyof typeof imageMetadata];
+    return {
+      image: imagePath,
+      caption: metadata ? `${metadata.date} · ${metadata.location}` : '',
+    };
   });
 
   // WebGL ripple background
@@ -220,19 +219,38 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
     if (isAnimating) return;
     setIsAnimating(true);
 
+    // Clear entering state immediately to prevent glitches
+    setIsEntering(false);
+
     if (action === 'release') {
       setReleasedCount(releasedCount + 1);
     } else {
       setPreservedCount(preservedCount + 1);
     }
 
+    const nextIndex = currentIndex + 1;
+
+    // Set the exiting card with current index
+    setExitingCard({ index: currentIndex, direction: action });
+
+    // Check if we're going to show a reflection
+    const willShowReflection = nextIndex < memories.length && nextIndex % 5 === 0;
+
+    // If showing reflection, don't update currentIndex yet (will update after reflection)
+    // Otherwise, immediately update to next card so it shows underneath
+    if (nextIndex < memories.length && !willShowReflection) {
+      setCurrentIndex(nextIndex);
+      setIsEntering(true);
+    }
+
     setTimeout(() => {
-      const nextIndex = currentIndex + 1;
+      // Clear exiting card
+      setExitingCard(null);
 
       if (nextIndex >= memories.length) {
         setShowEnd(true);
         setIsAnimating(false);
-      } else if (nextIndex % 5 === 0) {
+      } else if (willShowReflection) {
         // Show reflection every 5 cards
         const prompt = reflectionPrompts[Math.floor(Math.random() * reflectionPrompts.length)];
         setReflectionText(prompt);
@@ -241,13 +259,13 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
         setTimeout(() => {
           setShowReflection(false);
           setCurrentIndex(nextIndex);
+          setIsEntering(true);
           setIsAnimating(false);
-        }, 2800);
+        }, 2000);
       } else {
-        setCurrentIndex(nextIndex);
         setIsAnimating(false);
       }
-    }, 1200);
+    }, 800);
   };
 
   const handleReset = () => {
@@ -256,7 +274,18 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
     setPreservedCount(0);
     setShowEnd(false);
     setIsAnimating(false);
+    setIsEntering(true);
   };
+
+  // Clear entering state after animation completes
+  useEffect(() => {
+    if (isEntering) {
+      const timer = setTimeout(() => {
+        setIsEntering(false);
+      }, 1200); // Match the slideIn animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [isEntering]);
 
   // Keyboard controls
   useEffect(() => {
@@ -274,14 +303,53 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
   const containerOpacity = phase7Progress;
 
   return (
-    <div
-      className="fixed inset-0 z-40 transition-opacity duration-1000"
-      style={{
-        opacity: containerOpacity,
-        pointerEvents: phase7Progress > 0.5 ? 'auto' : 'none',
-      }}
-    >
-      {/* Film grain overlay */}
+    <>
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.94);
+            filter: blur(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0px);
+          }
+        }
+        @keyframes slideOutLeft {
+          from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            filter: blur(0px);
+          }
+          to {
+            opacity: 0;
+            transform: translateX(-120px) scale(0.96);
+            filter: blur(8px);
+          }
+        }
+        @keyframes slideOutRight {
+          from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            filter: blur(0px);
+          }
+          to {
+            opacity: 0;
+            transform: translateX(120px) scale(0.96);
+            filter: blur(8px);
+          }
+        }
+      `}</style>
+      <div
+        className="fixed inset-0 z-40 transition-opacity duration-1000"
+        style={{
+          opacity: containerOpacity,
+          pointerEvents: phase7Progress > 0.5 ? 'auto' : 'none',
+        }}
+      >
+        {/* Film grain overlay */}
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.035]">
         <div className="w-full h-full bg-[url('data:image/svg+xml,%3Csvg viewBox=%270 0 200 200%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27noise%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23noise)%27/%3E%3C/svg%3E')]" />
       </div>
@@ -309,29 +377,76 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
       <div className="relative z-10 flex flex-col items-center gap-11 mt-[54px] h-screen justify-center">
         {!showEnd && !showReflection && currentMemory && (
           <>
-            {/* Memory Card */}
-            <div className="w-[480px] h-[640px] bg-[rgba(18,18,24,0.9)] rounded-2xl overflow-hidden border border-white/[0.04] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7),0_0_1px_rgba(255,255,255,0.05)] flex flex-col">
-              <div className="relative flex-1 overflow-hidden bg-[#0a0a0f]">
-                <img
-                  src={currentMemory.image}
-                  alt="Memory"
-                  className="w-full h-full object-cover"
-                  style={{
-                    filter: 'saturate(0.8) contrast(1.02) brightness(0.95)',
-                  }}
-                />
-                {/* Photo vignette + fade effect */}
-                <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-                  style={{
-                    background: 'radial-gradient(ellipse at center, transparent 30%, rgba(8, 8, 12, 0.4) 100%), linear-gradient(to bottom, transparent 60%, rgba(18, 18, 24, 0.95) 100%)',
-                  }}
-                />
-                <div className="absolute bottom-0 left-0 right-0 z-20 p-6 pb-7">
-                  <div className="font-mono text-xs text-white tracking-[0.03em] leading-relaxed">
-                    {currentMemory.caption}
+            {/* Card stack - positioned absolutely to overlap */}
+            <div className="relative w-[480px] h-[640px]">
+              {/* Current card - always visible underneath (unless exiting card is for reflection) */}
+              <div
+                className="absolute inset-0 w-[480px] h-[640px] bg-[rgba(18,18,24,0.9)] rounded-2xl overflow-hidden border border-white/[0.04] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7),0_0_1px_rgba(255,255,255,0.05)] flex flex-col"
+                style={{
+                  ...(exitingCard && ((exitingCard.index + 1) % 5 === 0)
+                    ? { opacity: 0 }
+                    : isEntering
+                    ? { opacity: 0, transform: 'translateY(20px) scale(0.94)', filter: 'blur(12px)' }
+                    : {}),
+                  animation: isEntering ? 'slideIn 1.2s cubic-bezier(0.645, 0.045, 0.355, 1) forwards' : 'none',
+                }}
+                key={currentIndex}
+              >
+                <div className="relative flex-1 overflow-hidden bg-[#0a0a0f]">
+                  <img
+                    src={currentMemory.image}
+                    alt="Memory"
+                    className="w-full h-full object-cover"
+                    style={{
+                      filter: 'saturate(0.8) contrast(1.02) brightness(0.95)',
+                    }}
+                  />
+                  {/* Photo vignette + fade effect */}
+                  <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+                    style={{
+                      background: 'radial-gradient(ellipse at center, transparent 30%, rgba(8, 8, 12, 0.4) 100%), linear-gradient(to bottom, transparent 60%, rgba(18, 18, 24, 0.95) 100%)',
+                    }}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 z-20 p-6 pb-7">
+                    <div className="font-mono text-xs text-white tracking-[0.03em] leading-relaxed">
+                      {currentMemory.caption}
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* Exiting card - slides away on top */}
+              {exitingCard && (
+                <div
+                  className="absolute inset-0 w-[480px] h-[640px] bg-[rgba(18,18,24,0.9)] rounded-2xl overflow-hidden border border-white/[0.04] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7),0_0_1px_rgba(255,255,255,0.05)] flex flex-col z-10"
+                  style={{
+                    animation: 'slideOut 0.8s cubic-bezier(0.645, 0.045, 0.355, 1) forwards',
+                    animationName: exitingCard.direction === 'release' ? 'slideOutLeft' : 'slideOutRight',
+                  }}
+                >
+                  <div className="relative flex-1 overflow-hidden bg-[#0a0a0f]">
+                    <img
+                      src={memories[exitingCard.index].image}
+                      alt="Memory"
+                      className="w-full h-full object-cover"
+                      style={{
+                        filter: 'saturate(0.8) contrast(1.02) brightness(0.95)',
+                      }}
+                    />
+                    {/* Photo vignette + fade effect */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+                      style={{
+                        background: 'radial-gradient(ellipse at center, transparent 30%, rgba(8, 8, 12, 0.4) 100%), linear-gradient(to bottom, transparent 60%, rgba(18, 18, 24, 0.95) 100%)',
+                      }}
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 z-20 p-6 pb-7">
+                      <div className="font-mono text-xs text-white tracking-[0.03em] leading-relaxed">
+                        {memories[exitingCard.index].caption}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
@@ -419,5 +534,6 @@ export default function MemoryCuration({ phase7Progress }: MemoryCurationProps) 
         )}
       </div>
     </div>
+    </>
   );
 }
