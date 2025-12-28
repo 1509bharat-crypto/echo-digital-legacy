@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { IMAGE_PATHS } from '@/lib/imagePaths';
 import imageMetadata from '@/lib/imageMetadata.json';
+import MemoryCuration from './MemoryCuration';
 
 // Easing functions for smooth transitions
 const easeOutQuad = (t: number): number => {
@@ -20,6 +21,7 @@ export default function ThreeSphere() {
   const [phase4Progress, setPhase4Progress] = useState(0);
   const [phase5Progress, setPhase5Progress] = useState(0);
   const [phase6Progress, setPhase6Progress] = useState(0);
+  const [phase7Progress, setPhase7Progress] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -305,14 +307,27 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
+      } else if (scrollProgress <= 1.0) {
+        // Phase 7: 96% - 100% scroll = fade out sphere and text, transition to curation
+        const phase7Progress = easeInOutQuad((scrollProgress - 0.96) / 0.04);
+        targetZ = -1.1;
+        targetX = 0;
+        targetY = 0.5;
+        targetRotationY = -Math.PI * 2.75; // Keep final rotation
+        targetRotationX = 0;
+        targetSphereScale = 1;
+
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
+        }
       } else {
         // After all phases
         targetZ = -1.1;
         targetX = 0;
         targetY = 0.5;
-        targetRotationY = -Math.PI * 3.15; // Keep final rotation at -567°
+        targetRotationY = -Math.PI * 2.75;
         targetRotationX = 0;
-        targetSphereScale = 1; // No scaling
+        targetSphereScale = 1;
 
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
@@ -438,10 +453,16 @@ export default function ThreeSphere() {
         ? easeInOutQuad((scrollProgress - 0.90) / 0.04)
         : scrollProgress > 0.94 ? 1 : 0;
 
+      // Phase 7 effects (96%-100%) - fade out everything, transition to curation
+      const phase7ProgressValue = scrollProgress > 0.96 && scrollProgress <= 1.0
+        ? easeInOutQuad((scrollProgress - 0.96) / 0.04)
+        : scrollProgress > 1.0 ? 1 : 0;
+
       // Update state for React component
       setPhase4Progress(phase4ProgressValue);
       setPhase5Progress(phase5ProgressValue);
       setPhase6Progress(phase6ProgressValue);
+      setPhase7Progress(phase7ProgressValue);
 
       // Update each mesh
       meshes.forEach((meshData) => {
@@ -455,8 +476,11 @@ export default function ThreeSphere() {
         let baseOpacity = 0.1 + normalizedDepth * 0.9;
 
         // Fade out squares during Phase 4 with smooth easing
-        if (scrollProgress > 0.70) {
+        if (scrollProgress > 0.70 && scrollProgress <= 0.96) {
           baseOpacity *= (1 - phase4ProgressValue);
+        } else if (scrollProgress > 0.96) {
+          // Phase 7: fade out completely
+          baseOpacity *= (1 - phase7ProgressValue);
         }
 
         // Update base square opacity
@@ -609,7 +633,9 @@ export default function ThreeSphere() {
         <div
           className="w-full h-screen flex items-center justify-center text-center px-4 absolute inset-0"
           style={{
-            opacity: easeInOutQuad(phase6Progress),
+            opacity: phase7Progress > 0
+              ? easeInOutQuad(phase6Progress) * (1 - easeInOutQuad(phase7Progress))
+              : easeInOutQuad(phase6Progress),
             fontWeight: 100 + (easeInOutQuad(phase6Progress) * 100),
           }}
         >
@@ -618,6 +644,10 @@ export default function ThreeSphere() {
           </p>
         </div>
       </div>
+
+      {/* Memory Curation Interface - fades in during Phase 7 */}
+      <MemoryCuration phase7Progress={phase7Progress} />
+
       <div className="h-[300vh] pointer-events-auto" />
     </>
   );
