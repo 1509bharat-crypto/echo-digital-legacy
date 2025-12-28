@@ -6,10 +6,6 @@ import { IMAGE_PATHS } from '@/lib/imagePaths';
 import imageMetadata from '@/lib/imageMetadata.json';
 
 // Easing functions for smooth transitions
-const easeInOutCubic = (t: number): number => {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-};
-
 const easeOutQuad = (t: number): number => {
   return 1 - (1 - t) * (1 - t);
 };
@@ -229,7 +225,7 @@ export default function ThreeSphere() {
       // Phase 1: 0% - 35% scroll = zoom in (z: 18 to 0.3) with easing
       // Organic rotation: Start slow, accelerate (left to right)
       if (scrollProgress <= 0.35) {
-        const phase1Progress = easeInOutCubic(scrollProgress / 0.35);
+        const phase1Progress = easeInOutQuad(scrollProgress / 0.35);
         targetZ = 18 - phase1Progress * 17.7;
         targetX = -4 + phase1Progress * 4; // Move from -4 to 0
         targetY = 1 - phase1Progress * 0.5; // Move from 1 to 0.5
@@ -254,10 +250,10 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
-      } else if (scrollProgress <= 0.62) {
-        // Phase 3: 42% - 62% scroll = interactive rotation while zooming deeper
+      } else if (scrollProgress <= 0.70) {
+        // Phase 3: 42% - 70% scroll = interactive rotation while zooming deeper
         // Organic rotation: Slow down for exploration (left to right)
-        const phase3Progress = easeInOutCubic((scrollProgress - 0.42) / 0.20);
+        const phase3Progress = easeInOutQuad((scrollProgress - 0.42) / 0.28);
         targetZ = -0.7 - phase3Progress * 0.4; // Zoom from -0.7 to -1.1 (deeper inside)
         targetX = 0; // Keep centered
         targetY = 0.5; // Keep centered vertically
@@ -268,16 +264,16 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
-      } else if (scrollProgress <= 0.82) {
-        // Phase 4: 62% - 82% scroll = scale up sphere, fade out squares, fade in text
-        const phase4Progress = easeInOutCubic((scrollProgress - 0.62) / 0.20);
+      } else if (scrollProgress <= 0.90) {
+        // Phase 4: 70% - 90% scroll = fade out squares, fade in text
+        const phase4Progress = easeInOutQuad((scrollProgress - 0.70) / 0.20);
         targetZ = -1.1; // Keep deep zoom
         targetX = 0;
         targetY = 0.5;
         // Continue organic rotation: -423° to -567° (144° gentle turn)
         targetRotationY = -Math.PI * 2.35 - phase4Progress * Math.PI * 0.8; // -423° to -567°
         targetRotationX = 0;
-        targetSphereScale = 1 + phase4Progress * 2; // Scale from 1 to 3
+        targetSphereScale = 1; // No scaling
 
         // Keep logo hidden
         if (logoRef.current) {
@@ -290,7 +286,7 @@ export default function ThreeSphere() {
         targetY = 0.5;
         targetRotationY = -Math.PI * 3.15; // Keep final rotation at -567°
         targetRotationX = 0;
-        targetSphereScale = 3; // Keep scaled
+        targetSphereScale = 1; // No scaling
 
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
@@ -394,15 +390,15 @@ export default function ThreeSphere() {
         ? easeInOutQuad((scrollProgress - 0.35) / 0.07)
         : scrollProgress > 0.42 ? 1 : 0;
 
-      // Text fade-in during Phase 3 (42%-62%) with easing
-      const textFadeProgress = scrollProgress > 0.42 && scrollProgress <= 0.62
-        ? easeInOutCubic((scrollProgress - 0.42) / 0.20)
-        : scrollProgress > 0.62 ? 1 : 0;
+      // Text fade-in during Phase 3 (42%-70%) with easing
+      const textFadeProgress = scrollProgress > 0.42 && scrollProgress <= 0.70
+        ? easeInOutQuad((scrollProgress - 0.42) / 0.28)
+        : scrollProgress > 0.70 ? 1 : 0;
 
-      // Phase 4 effects (62%-82%) with easing
-      const phase4ProgressValue = scrollProgress > 0.62 && scrollProgress <= 0.82
-        ? easeInOutCubic((scrollProgress - 0.62) / 0.20)
-        : scrollProgress > 0.82 ? 1 : 0;
+      // Phase 4 effects (70%-90%) with easing
+      const phase4ProgressValue = scrollProgress > 0.70 && scrollProgress <= 0.90
+        ? easeInOutQuad((scrollProgress - 0.70) / 0.20)
+        : scrollProgress > 0.90 ? 1 : 0;
 
       // Update state for React component
       setPhase4Progress(phase4ProgressValue);
@@ -419,7 +415,7 @@ export default function ThreeSphere() {
         let baseOpacity = 0.1 + normalizedDepth * 0.9;
 
         // Fade out squares during Phase 4 with smooth easing
-        if (scrollProgress > 0.62) {
+        if (scrollProgress > 0.70) {
           baseOpacity *= (1 - phase4ProgressValue);
         }
 
@@ -430,11 +426,11 @@ export default function ThreeSphere() {
         }
 
         // Show images on all squares once in Phase 2 or later
-        const showImages = scrollProgress >= 0.35 && scrollProgress < 0.62;
+        const showImages = scrollProgress >= 0.35 && scrollProgress < 0.70;
 
         // Fade in images during Phase 2, fade out during Phase 4 with smoother transitions
         let targetImageOpacity = showImages ? imageFadeProgress : 0;
-        if (scrollProgress >= 0.62) {
+        if (scrollProgress >= 0.70) {
           targetImageOpacity = imageFadeProgress * (1 - phase4ProgressValue);
         }
         meshData.targetImageOpacity = targetImageOpacity;
@@ -448,7 +444,7 @@ export default function ThreeSphere() {
 
         // Fade in text during Phase 3, fade out during Phase 4 with smoother transitions
         let targetTextOpacity = textFadeProgress;
-        if (scrollProgress >= 0.62) {
+        if (scrollProgress >= 0.70) {
           targetTextOpacity = textFadeProgress * (1 - phase4ProgressValue);
         }
         meshData.targetTextOpacity = targetTextOpacity;
@@ -542,12 +538,12 @@ export default function ThreeSphere() {
         <div
           className="w-full h-screen flex items-center justify-center text-center px-4"
           style={{
-            opacity: easeInOutCubic(phase4Progress),
-            fontWeight: 100 + (easeInOutCubic(phase4Progress) * 400), // 100 (thin) to 500 (medium)
+            opacity: easeInOutQuad(phase4Progress),
+            fontWeight: 100 + (easeInOutQuad(phase4Progress) * 100), // 100 (thin) to 200 (extra-light)
           }}
         >
           <p className="text-white text-6xl font-sans max-w-5xl">
-            What happens to our digital presence when we pass away?
+            What happens to your digital presence when you pass away?
           </p>
         </div>
       </div>
