@@ -18,6 +18,8 @@ export default function ThreeSphere() {
   const containerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   const [phase4Progress, setPhase4Progress] = useState(0);
+  const [phase5Progress, setPhase5Progress] = useState(0);
+  const [phase6Progress, setPhase6Progress] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -264,14 +266,14 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
-      } else if (scrollProgress <= 0.90) {
-        // Phase 4: 70% - 90% scroll = fade out squares, fade in text
-        const phase4Progress = easeInOutQuad((scrollProgress - 0.70) / 0.20);
+      } else if (scrollProgress <= 0.76) {
+        // Phase 4: 70% - 76% scroll = fade out squares, fade in text (slower rotation)
+        const phase4Progress = easeInOutQuad((scrollProgress - 0.70) / 0.06);
         targetZ = -1.1; // Keep deep zoom
         targetX = 0;
         targetY = 0.5;
-        // Continue organic rotation: -423° to -567° (144° gentle turn)
-        targetRotationY = -Math.PI * 2.35 - phase4Progress * Math.PI * 0.8; // -423° to -567°
+        // Slower organic rotation: -423° to -495° (72° gentle turn, half of original)
+        targetRotationY = -Math.PI * 2.35 - phase4Progress * Math.PI * 0.4;
         targetRotationX = 0;
         targetSphereScale = 1; // No scaling
 
@@ -279,8 +281,32 @@ export default function ThreeSphere() {
         if (logoRef.current) {
           logoRef.current.style.opacity = '0';
         }
+      } else if (scrollProgress <= 0.86) {
+        // Phase 5: 76% - 86% scroll = hold first text, gap, then transition to second text
+        targetZ = -1.1;
+        targetX = 0;
+        targetY = 0.5;
+        targetRotationY = -Math.PI * 2.75; // Keep final rotation
+        targetRotationX = 0;
+        targetSphereScale = 1;
+
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
+        }
+      } else if (scrollProgress <= 0.96) {
+        // Phase 6: 86% - 96% scroll = hold second text, gap, then transition to third text
+        targetZ = -1.1;
+        targetX = 0;
+        targetY = 0.5;
+        targetRotationY = -Math.PI * 2.75; // Keep final rotation
+        targetRotationX = 0;
+        targetSphereScale = 1;
+
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '0';
+        }
       } else {
-        // After Phase 4
+        // After all phases
         targetZ = -1.1;
         targetX = 0;
         targetY = 0.5;
@@ -395,13 +421,27 @@ export default function ThreeSphere() {
         ? easeInOutQuad((scrollProgress - 0.42) / 0.28)
         : scrollProgress > 0.70 ? 1 : 0;
 
-      // Phase 4 effects (70%-90%) with easing
-      const phase4ProgressValue = scrollProgress > 0.70 && scrollProgress <= 0.90
-        ? easeInOutQuad((scrollProgress - 0.70) / 0.20)
-        : scrollProgress > 0.90 ? 1 : 0;
+      // Phase 4 effects (70%-76%) with easing
+      const phase4ProgressValue = scrollProgress > 0.70 && scrollProgress <= 0.76
+        ? easeInOutQuad((scrollProgress - 0.70) / 0.06)
+        : scrollProgress > 0.76 ? 1 : 0;
+
+      // Phase 5 effects (76%-86%) - text transition with hold time and gap
+      // Hold first text 76%-80%, then super slow fade 80%-84%, hold second text 84%-86%
+      const phase5ProgressValue = scrollProgress > 0.80 && scrollProgress <= 0.84
+        ? easeInOutQuad((scrollProgress - 0.80) / 0.04)
+        : scrollProgress > 0.84 ? 1 : 0;
+
+      // Phase 6 effects (86%-96%) - text transition with hold time and gap
+      // Hold second text 86%-90%, then super slow fade 90%-94%, hold third text 94%-96%
+      const phase6ProgressValue = scrollProgress > 0.90 && scrollProgress <= 0.94
+        ? easeInOutQuad((scrollProgress - 0.90) / 0.04)
+        : scrollProgress > 0.94 ? 1 : 0;
 
       // Update state for React component
       setPhase4Progress(phase4ProgressValue);
+      setPhase5Progress(phase5ProgressValue);
+      setPhase6Progress(phase6ProgressValue);
 
       // Update each mesh
       meshes.forEach((meshData) => {
@@ -535,15 +575,46 @@ export default function ThreeSphere() {
       </div>
       {/* Phase 4 Big Text */}
       <div className="fixed inset-0 z-30 pointer-events-none flex items-center justify-center">
+        {/* First text: "What happens to your digital presence when you pass away?" */}
         <div
-          className="w-full h-screen flex items-center justify-center text-center px-4"
+          className="w-full h-screen flex items-center justify-center text-center px-4 absolute inset-0"
           style={{
-            opacity: easeInOutQuad(phase4Progress),
+            opacity: phase5Progress > 0 ? easeInOutQuad(1 - phase5Progress) : easeInOutQuad(phase4Progress),
             fontWeight: 100 + (easeInOutQuad(phase4Progress) * 100), // 100 (thin) to 200 (extra-light)
           }}
         >
           <p className="text-white text-6xl font-sans max-w-5xl">
             What happens to your digital presence when you pass away?
+          </p>
+        </div>
+
+        {/* Second text: "Echo helps you shape how you'll be remembered" */}
+        <div
+          className="w-full h-screen flex items-center justify-center text-center px-4 absolute inset-0"
+          style={{
+            opacity: phase6Progress > 0
+              ? easeInOutQuad(1 - phase6Progress)
+              : phase5Progress > 0
+                ? easeInOutQuad(phase5Progress)
+                : 0,
+            fontWeight: 100 + (easeInOutQuad(Math.max(phase5Progress, phase6Progress)) * 100),
+          }}
+        >
+          <p className="text-white text-6xl font-sans max-w-5xl">
+            Echo helps you shape how you'll be remembered
+          </p>
+        </div>
+
+        {/* Third text: "It begins with you" */}
+        <div
+          className="w-full h-screen flex items-center justify-center text-center px-4 absolute inset-0"
+          style={{
+            opacity: easeInOutQuad(phase6Progress),
+            fontWeight: 100 + (easeInOutQuad(phase6Progress) * 100),
+          }}
+        >
+          <p className="text-white text-6xl font-sans max-w-5xl">
+            It begins with you
           </p>
         </div>
       </div>
